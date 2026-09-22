@@ -1,0 +1,22 @@
+# Example dbt project configuration illustrating the staging -> marts
+# layering convention used in production. Generic names throughout.
+
+name: 'analytics_platform_example'
+version: '1.0.0'
+profile: 'analytics_platform_example'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  analytics_platform_example:
+    staging:
+      +materialized: table
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

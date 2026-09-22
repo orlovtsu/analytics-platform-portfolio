@@ -1,0 +1,16 @@
+# Sanitized skeleton for the ad-hoc dbt runner container. In production the
+# scheduled runs actually execute from a host Python venv via cron
+# (see examples/docker-compose/../../docs/architecture.md), and this compose
+# service is used for local/manual `dbt run` and `dbt test` invocations
+# against the same profile.
+
+services:
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+    container_name: dbt
+    working_dir: /usr/app
+    volumes:
+      - ./project:/usr/app
+      - ./profiles:/root/.dbt
+    env_file:
+      - .env

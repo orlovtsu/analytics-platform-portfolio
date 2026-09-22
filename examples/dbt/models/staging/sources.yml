@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Landing zone written by both the connector-based (Airbyte) and custom Airflow ingestion DAGs.
+    schema: raw
+    tables:
+      - name: source_orders
+        description: Example raw source table, loaded as-is from the source system.

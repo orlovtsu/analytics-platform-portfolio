@@ -1,0 +1,8 @@
+.env
+*.pem
+*.key
+*.pfx
+*.crt
+secrets/
+__pycache__/
+.DS_Store
