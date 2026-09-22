@@ -1,8 +1,5 @@
-# Sanitized skeleton for the ad-hoc dbt runner container. In production the
-# scheduled runs actually execute from a host Python venv via cron
-# (see examples/docker-compose/../../docs/architecture.md), and this compose
-# service is used for local/manual `dbt run` and `dbt test` invocations
-# against the same profile.
+# Illustrative container for manual dbt commands. Supply a project, profiles,
+# and environment configuration for your own test environment.
 
 services:
   dbt:
