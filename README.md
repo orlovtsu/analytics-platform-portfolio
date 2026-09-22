@@ -1,101 +1,22 @@
-# Self-Hosted Analytics Platform — Reference Architecture
+# Analytics Engineering - Patterns and Examples
 
-> A write-up of a production analytics platform I designed and operate for a mid-size financial services company: ingestion, orchestration, transformation, storage and BI, running self-hosted on a single Linux host.
->
-> **This repository contains no proprietary business data, credentials, internal hostnames, or company-specific schema.** Every example is generic and rebuilt from scratch to illustrate the *patterns* used in production, not the production code itself. See [Anonymization note](#anonymization-note).
+Generic examples and design discussions covering ingestion, orchestration, transformation, storage, and BI. These materials are informed by my professional experience and illustrate general engineering concepts; they do not document any employer's current deployment or operational results.
 
-## Why this exists
+## What you can inspect
 
-Most public "data stack" write-ups describe greenfield setups on managed cloud services (Snowflake, Fivetran, managed Airflow). This one is different: a **from-scratch, self-hosted stack on a single VM**, built and operated under real constraints — legacy on-prem source systems (MSSQL/SSRS), a fixed infrastructure budget, and a small (one-person) data engineering team. It documents the trade-offs, the tooling choices, and one specific case where I patched open-source BI software to fix a limitation that was blocking the business.
+- [Design discussion](docs/architecture.md): ingestion choices, modeling layers, data quality, and operational considerations.
+- [Airflow example](examples/airflow/example_source_table_ingestion_dag.py): a small, full-refresh extract/load pattern with generic source and target names.
+- [dbt examples](examples/dbt/): staging and mart models, schema tests, and a reconciliation query.
+- [Container examples](examples/docker-compose/): illustrative service configuration, requiring adaptation before use.
+- [Reverse-proxy example](examples/nginx/reverse-proxy.conf): a placeholder configuration for a local test environment.
+- [BI engineering discussion](docs/case-study-metabase-pivot-patch.md): reasoning about result limits, resource use, and validation.
 
-## Stack at a glance
+## Scope
 
-| Layer | Technology | Notes |
-|---|---|---|
-| Orchestration | **Apache Airflow 3.x** (CeleryExecutor) | Docker Compose: apiserver, scheduler, dag-processor, worker, triggerer, dedicated Postgres + Redis |
-| Ingestion (EL) | **Airflow TaskFlow DAGs** (custom, per-source-table) + **Airbyte** | Hybrid: connector-based ingestion where it fits, hand-written extract/load for legacy sources that need fine-grained control |
-| Transformation (T) | **dbt-core** (postgres adapter) | Layered `staging` → `marts` models, scheduled via cron |
-| Storage | **PostgreSQL** | Central analytics warehouse, schema-per-stage, role-based access (incl. LDAP/AD-backed roles for analysts) |
-| BI | **Metabase**, built from source with a custom patch (case study below); Superset evaluated in parallel | Multi-version image strategy for safe rollback |
-| Edge / networking | **nginx** (TLS termination, subdomain routing) + **Cloudflare Tunnel** | Single reverse proxy in front of every internal service |
-| Infra | Single Azure VM, Ubuntu 22.04, Docker Compose per service | No Kubernetes — deliberately kept operationally simple for a small team |
+This is an illustrative collection, not a complete runnable platform. The examples require connections, test data, dependency configuration, and operational controls supplied by the reader. They are not production recommendations or evidence of production scale, model performance, infrastructure capacity, business volumes, or financial outcomes.
 
-## Architecture
-
-```mermaid
-flowchart LR
-    subgraph Sources
-        S1[(Legacy MSSQL\nsource systems)]
-    end
-
-    subgraph Ingestion["Ingestion (EL)"]
-        AB[Airbyte\nconnector-based]
-        DAGs["~200 generated\nAirflow TaskFlow DAGs\n(1 per source table)"]
-    end
-
-    subgraph Orchestration["Apache Airflow"]
-        SCH[Scheduler / DAG processor]
-        WRK[Celery workers]
-    end
-
-    subgraph Warehouse["PostgreSQL"]
-        RAW[(raw)]
-        STG[(staging)]
-        MART[(marts)]
-    end
-
-    DBT[dbt-core\nstaging -> marts]
-
-    subgraph BI
-        MB[Metabase\ncustom build]
-        SS[Superset\nevaluated]
-    end
-
-    EDGE[nginx + Cloudflare Tunnel]
-
-    S1 --> AB --> RAW
-    S1 --> DAGs --> RAW
-    SCH --> DAGs
-    WRK --> DAGs
-    RAW --> DBT --> STG --> DBT --> MART
-    MART --> MB
-    MART --> SS
-    EDGE --> MB
-    EDGE --> SCH
-    EDGE --> AB
-```
-
-## What I designed and own
-
-- **Ingestion strategy**: a hybrid EL layer — Airbyte for sources with good off-the-shelf connectors, and ~200 generated Airflow TaskFlow DAGs (one per source table) for a legacy MSSQL reporting database that needed table-by-table control over schedule and incrementality. See [`examples/airflow/`](examples/airflow/).
-- **Transformation layer**: a dbt project with a `staging → marts` layering convention, materialization strategy per layer, and a custom `generate_schema_name` macro. See [`examples/dbt/`](examples/dbt/).
-- **BI platform**: built and operate a custom Metabase image compiled from source (Clojure/JVM backend, React/Bun frontend), including a source-level patch to the pivot-table query engine — see the [case study](docs/case-study-metabase-pivot-patch.md).
-- **Edge/networking**: single nginx reverse proxy terminating TLS for every internal service, fronted by a Cloudflare Tunnel instead of opening inbound ports directly on the host.
-- **Access model**: warehouse roles scoped per tool (ingestion, transformation, BI each get their own least-privilege Postgres role), with analyst access backed by the company's existing Active Directory/LDAP rather than shared local accounts.
-
-## Case study: patching Metabase's pivot-table row limit
-
-Read the full write-up: [`docs/case-study-metabase-pivot-patch.md`](docs/case-study-metabase-pivot-patch.md)
-
-Short version: Metabase's pivot query processor divides its row cap by the number of aggregation columns in the query, which meant multi-metric pivot exports were being truncated well below what the business needed. I traced it to `query_processor/pivot.clj`, patched the limit calculation, rebuilt Metabase from source, and rolled it out with a versioned image strategy that kept every prior build available for instant rollback.
-
-## Repository layout
-
-```
-docs/                          architecture notes and the Metabase case study
-examples/airflow/              generic example of the per-table EL DAG pattern
-examples/dbt/                  generic example dbt project layout (staging -> marts)
-  models/staging/schema.yml       generic + relationship tests at the layer data enters
-  models/marts/schema.yml         grain, range and cross-column tests on the BI-facing layer
-  tests/                          singular test reconciling row counts between layers
-examples/docker-compose/       sanitized compose skeletons (Airflow, dbt runner)
-examples/nginx/                sanitized reverse-proxy config pattern
-```
-
-## Anonymization note
-
-Everything under `examples/` and `docs/` in this repo is **rewritten from scratch** using generic table/column/domain names (`orders`, `customers`, `source_system`, etc.). No real hostnames, credentials, certificates, connection strings, internal database/schema names, or business-specific table structures from any employer are included here. The Metabase patch shown in the case study applies to the public, open-source Metabase codebase (AGPL-3.0) and contains no proprietary code.
+Example names such as `orders`, `customers`, and `source_system` are generic. The examples do not include customer records, employer connection details, or employer-specific schemas. Descriptions of design alternatives should not be interpreted as descriptions of an employer's infrastructure or security controls.
 
 ## License
 
-Code samples in this repository are released under the [MIT License](LICENSE). The Metabase excerpt referenced in the case study remains under Metabase's own license (AGPL-3.0); see the case study for attribution.
+Code samples are provided under the [MIT License](LICENSE). Refer to each third-party project's own license for its software.
