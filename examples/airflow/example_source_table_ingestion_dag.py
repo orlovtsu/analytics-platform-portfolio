@@ -1,14 +1,8 @@
-"""
-Example of the per-source-table ingestion DAG pattern used in production.
+"""Generic full-refresh extraction example using placeholder connection names.
 
-This is a GENERIC, rebuilt-from-scratch illustration, not a copy of any real
-DAG. Real production DAGs follow this exact shape (~200 of them, one per
-source table), with real connection IDs, schema and table names swapped out.
-
-Pattern: each DAG is a thin, declarative wrapper around "pull one table from
-a legacy source database, land it as-is in the warehouse's raw schema".
-Credentials are never hardcoded — they come from Airflow Connections, which
-are backed by Airflow's configured secrets backend.
+This illustrates a small extract/load task, not an employer implementation.
+It requires existing source and target tables and reader-supplied connections.
+The task reads rows into memory; adapt it before using it for larger datasets.
 """
 from __future__ import annotations
 
@@ -20,8 +14,7 @@ import pymssql
 from airflow.sdk import dag, task
 from airflow.sdk.bases.hook import BaseHook
 
-# --- Per-DAG configuration (this block is what actually differs between
-#     the ~200 generated DAG files) -----------------------------------------
+# --- Illustrative per-table configuration --------------------------------
 SOURCE_CONN_ID = "source_mssql_reporting_db"
 TARGET_CONN_ID = "warehouse_postgres"
 
