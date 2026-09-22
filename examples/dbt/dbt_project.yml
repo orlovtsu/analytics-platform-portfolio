@@ -1,5 +1,5 @@
 # Example dbt project configuration illustrating the staging -> marts
-# layering convention used in production. Generic names throughout.
+# layering convention. Generic names throughout.
 
 name: 'analytics_platform_example'
 version: '1.0.0'
