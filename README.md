@@ -85,6 +85,9 @@ Short version: Metabase's pivot query processor divides its row cap by the numbe
 docs/                          architecture notes and the Metabase case study
 examples/airflow/              generic example of the per-table EL DAG pattern
 examples/dbt/                  generic example dbt project layout (staging -> marts)
+  models/staging/schema.yml       generic + relationship tests at the layer data enters
+  models/marts/schema.yml         grain, range and cross-column tests on the BI-facing layer
+  tests/                          singular test reconciling row counts between layers
 examples/docker-compose/       sanitized compose skeletons (Airflow, dbt runner)
 examples/nginx/                sanitized reverse-proxy config pattern
 ```

@@ -1,0 +1,6 @@
+# Only dependency needed for the generic tests used in this example
+# (dbt_utils.accepted_range in models/staging/schema.yml and
+# models/marts/schema.yml). Install with `dbt deps`.
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.1.0", "<2.0.0"]

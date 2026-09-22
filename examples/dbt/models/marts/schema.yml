@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: mart_customer_order_summary
+    description: >
+      One row per customer, consumed directly by BI. Tested for grain and
+      for the two failure modes that would most visibly embarrass a
+      dashboard: a duplicated customer row, and a negative lifetime value
+      from a bad refund/cancellation join upstream.
+    columns:
+      - name: customer_id
+        description: Grain of this mart — one row per customer.
+        tests:
+          - unique
+          - not_null
+      - name: total_orders
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: lifetime_value
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+    tests:
+      # Table-level test: first_order_at can never be later than
+      # most_recent_order_at. A generic column test can't express a
+      # cross-column comparison like this, so dbt_utils.expression_is_true
+      # is used instead of a singular SQL file for something this small.
+      - dbt_utils.expression_is_true:
+          expression: "first_order_at <= most_recent_order_at"

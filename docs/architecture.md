@@ -34,6 +34,17 @@ Both write into a `raw` schema in the warehouse, keeping a single landing zone r
 - `marts`: business-level, aggregated/joined models consumed directly by BI. Each mart owns its own schema-per-layer convention via a custom `generate_schema_name` macro, so warehouse permissions can be granted per layer (BI tools get read-only on `marts`, never on `raw`).
 - Scheduled via cron (hourly + daily wrapper scripts) rather than Airflow, on the theory that dbt's own DAG resolution already handles inter-model dependencies — a dedicated Airflow DAG would just be reimplementing what `dbt run` does internally. (A reasonable alternative is wrapping `dbt run` in a single Airflow task for unified alerting; noted as a possible next step.)
 
+## Where data-quality tests live, and why
+
+Tests are placed at the layer where a defect would first become detectable, not all bolted onto the mart at the end:
+
+- **Sources** (`sources.yml`): `unique`/`not_null` on natural keys, plus a `freshness` check against the ingestion schedule. This catches "the daily load silently stopped running" before anyone notices the dashboard just looks unusually stable.
+- **Staging** (`models/staging/schema.yml`): the same key tests re-asserted after typing/renaming, plus a `relationships` test across the two staging models. A source-system change (e.g. a deleted customer) that would otherwise surface as a mysteriously shrinking mart is caught one layer earlier, closer to its actual cause.
+- **Marts** (`models/marts/schema.yml`): tests that only make sense once data is business-shaped — grain (`unique` on the mart's primary entity), value ranges, and a cross-column invariant (`first_order_at <= most_recent_order_at`) expressed with `dbt_utils.expression_is_true` rather than a bespoke SQL file, since it doesn't need one.
+- **Singular tests** (`tests/`): reserved for checks a generic test can't express — here, a row-count reconciliation between `stg_orders` and the mart, to catch a join silently fanning out or dropping rows during aggregation.
+
+The general rule: a generic (schema-level) test until the assertion needs more than one model or a real cross-column expression, and a singular SQL test only past that point — keeps `schema.yml` files scannable instead of every test escalating to hand-written SQL by default.
+
 ## Why a single Postgres instance, not a dedicated warehouse product
 
 At the current data volume, a well-indexed Postgres instance comfortably serves both the transformation workload and BI query patterns. The separation that matters more than "which product" is **schema-level isolation with role-based access**:

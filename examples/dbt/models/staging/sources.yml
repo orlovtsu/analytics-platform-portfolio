@@ -7,3 +7,35 @@ sources:
     tables:
       - name: source_orders
         description: Example raw source table, loaded as-is from the source system.
+        # Ingestion writes this table on a daily schedule (see the example DAG);
+        # `dbt source freshness` alerts if a load is late or silently stopped
+        # running, which a plain row-count check on staging would miss.
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count: 26, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: order_id
+            description: Primary key on the source system.
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            tests:
+              - not_null
+          - name: order_status
+            tests:
+              - accepted_values:
+                  values: ['pending', 'paid', 'shipped', 'cancelled']
+
+      - name: source_customers
+        description: Example raw customer dimension, loaded as-is from the source system.
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count: 26, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: customer_id
+            tests:
+              - unique
+              - not_null
